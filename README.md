@@ -40,3 +40,4 @@ O codigo e as instrucoes do launcher nativo estao em
 - A midia nao passa pelo Tor.
 - O uso pode contrariar os termos do Discord por contornar uma restricao regional.
 - O executavel Windows local nao tem assinatura Authenticode.
+- Nao pretendo dar suporte para qualquer erro, mas se quiser corrigir algo, fique a vontade, ta em casa.
