@@ -1,15 +1,5 @@
-# Scripts de shell precisam de LF: com CRLF o shebang vira "#!/usr/bin/env bash\r"
-# e o Linux responde "bad interpreter".
 *.sh text eol=lf
-
-# Batch precisa de CRLF.
-*.bat text eol=crlf
-*.cmd text eol=crlf
-
-*.ps1 text eol=crlf
-# O golivebypass.js do modo standalone e lido pelo Electron no Linux tambem.
-*.js text eol=lf
-*.ts text eol=lf
-*.tsx text eol=lf
+*.go text eol=lf
+*.py text eol=lf
 *.md text eol=lf
-*.json text eol=lf
+*.yml text eol=lf
