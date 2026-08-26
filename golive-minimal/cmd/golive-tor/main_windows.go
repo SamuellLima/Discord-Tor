@@ -18,58 +18,42 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/bezumiya/Discord-Tor/golive-minimal/internal/discord"
-	"github.com/bezumiya/Discord-Tor/golive-minimal/internal/pac"
-	"github.com/bezumiya/Discord-Tor/golive-minimal/internal/torbundle"
-	"github.com/bezumiya/Discord-Tor/golive-minimal/internal/torcheck"
+	"discord-tor/internal/banner"
+	"discord-tor/internal/discord"
+	"discord-tor/internal/pac"
+	"discord-tor/internal/torbundle"
+	"discord-tor/internal/torcheck"
 )
 
 const socksAddress = "127.0.0.1:9060"
 
 var logFile *os.File
 
-const startupArt = `                             %@@@@@@@@@@@@
-                        @@@@@+-.        -=%@@@@@#
-                     *@@@=     +@@@@@@@+.      +#@@@@
-                   @@@*   .@@@@@@@@@@@@@@@@@@@.    +@@@+
-                -@@@.   @@@@@@@@@@@@@@@@@@@@@@@@@@    #@@@
-               @@%   #@@%@@@@@@@@@@@@@@@@@@@@@@@@@@@@*  *@@
-              @@.  @@@@      @@@@@@@@@@@@@@@@@@@@@@@@@@  +@@
-            @@@:  @@@   @@@@  @@@@@@@@@@@@@@@@@@@@@@@@@@  %@
-        =@@@+:        @@@@@@@  +@@@@@@@@@@@.       @@@@@  :@@
-       @@#          #@@@@@@@@@  %@@@@@@+    =@%@@=  @@@@%  @@
-     .@@          .@@@@@@@@@@@## .#  .  .@@@@@@@@@.  @@@@  @@
-     @@          +@@@@@@@@@@###@###@###@@@@@@@@@@@%  @@@#  @@
-     @*         .@@@@@@@@@###%###%%##%@@@@@@@@@@@@-       :@@@
-     @+         @@@@@@@@@@@@@###@###@@@@@@@@@@@@            .@@@
-     @+        %@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@.               *@@
-     @@        %@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                 #@
-     %@@       %@#+*@@@@@@@@@@@@@@@@@@@@@@@@@@                 #@
-       @@@.     @=    @: :@@ @@@@@@@@@@@@@@@@@                 #@
-         @@@@@+  +@@@@@@          +@      @@@@@                @@
-            @#      :-@@@@@@@@****%@@@@@@@@@@@=               %@@
-            @%  .@@%=++=@@@@@@@@@@@@@@++==                  =@@=
-            @@@:  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@=  +%:..=@@@@%
-            @@+  %@@@@@@@@@@@@@@@@@@@@@@@@@@     .@@@++++
-         -@@@*  @@@@@@@@@@@@@@@@@@@@@@@@@@@@  #@@@@
-        @@#    %@@@@@@@@#####@@@@@@@@@@@@@@  +@@
-        @@  @@@@@@@@@@%@#@@#%@@@@@@@@@@@@@  :@@
-        @@@                ======@@@@@@@:  #@@
-          @@@@@@@@@@@@@###+:..::    .@%   @@@
-                          @@@@@@@  @   .@@@
-                               =@@   *@@@
-                                 %@@@@`
-
 func main() {
-	fmt.Printf("\n\n%s\n\n\n\n%s\n\n", startupArt, startupArt)
+	enableUTF8Console()
+	printBanner()
 
 	if alreadyRunning() {
+		consolef("ERRO", "O launcher ja esta em execucao.")
 		messageBox("Discord-Tor", "O launcher ja esta em execucao.", 0x40)
 		return
 	}
 	if err := run(); err != nil {
-		log.Printf("erro: %v", err)
+		consolef("ERRO", "%v", err)
 		messageBox("Discord-Tor - erro", err.Error(), 0x10)
+	}
+}
+
+func printBanner() {
+	fmt.Printf("\n%s\n\n", strings.TrimRight(banner.Art, "\n"))
+	consolef("AVISO", "Feito de ultima hora. Deve apresentar alguns bugs.")
+}
+
+func consolef(tag, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Fprintf(os.Stdout, "[%s] [%s] %s\n", time.Now().Format("15:04:05"), tag, msg)
+	if logFile != nil {
+		log.Printf("[%s] %s", tag, msg)
 	}
 }
 
@@ -88,17 +72,18 @@ func run() error {
 		defer logFile.Close()
 		log.SetOutput(logFile)
 	}
-	log.Printf("iniciando")
+	consolef("INFO", "Iniciando Discord-Tor.")
 
 	install, err := discord.FindPreferred(local)
 	if err != nil {
 		return err
 	}
-	log.Printf("cliente encontrado: %s", install.Flavor)
+	consolef("INFO", "Cliente encontrado: %s", install.Flavor)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	firstDownloadNotice := func() {
+		consolef("INFO", "Primeira execucao: baixando 21 MB do Tor Project e conferindo o SHA-256.")
 		messageBox("Discord-Tor", "Primeira execucao: vou baixar 21 MB do Tor Project e conferir o SHA-256 antes de executar.\n\nO Discord sera reiniciado em seguida.", 0x40)
 	}
 	torPaths, err := torbundle.Ensure(ctx, root, firstDownloadNotice)
@@ -109,6 +94,7 @@ func run() error {
 	if portInUse(socksAddress) {
 		return fmt.Errorf("a porta local 9060 ja esta em uso; feche outro Tor/GoLive antes de continuar")
 	}
+	consolef("INFO", "Iniciando Tor local em %s...", socksAddress)
 	torCmd, torDone, err := startTor(torPaths, root)
 	if err != nil {
 		return err
@@ -119,16 +105,18 @@ func run() error {
 		}
 	}()
 
+	consolef("INFO", "Aguardando SOCKS5 + TLS ate gateway.discord.gg...")
 	if err := waitForTor(ctx, torDone); err != nil {
 		return err
 	}
-	log.Printf("Tor entregando gateway.discord.gg com TLS valido")
+	consolef("OK", "Tor confirmado: gateway.discord.gg com TLS valido.")
 
 	pacURL, stopPAC, err := servePAC()
 	if err != nil {
 		return err
 	}
 	defer stopPAC()
+	consolef("INFO", "PAC local em %s", pacURL)
 
 	if err := stopDiscord(install.ProcessName); err != nil {
 		return err
@@ -137,10 +125,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("%s iniciado com PAC local", install.Flavor)
-	fmt.Printf("\n[OK] Tor iniciado e %s aberto.\n", install.Flavor)
-	fmt.Println("Mantenha este terminal aberto enquanto estiver usando o Discord.")
-	fmt.Println("Quando terminar, feche o Discord e este terminal sera encerrado automaticamente.")
+	consolef("OK", "%s aberto. Apenas discord.gg passa pelo Tor; midia fica direta.", install.Flavor)
+	consolef("INFO", "Mantenha este terminal aberto. Feche o Discord para encerrar.")
 
 	// If an update hands over to a new executable, do not leave that unverified
 	// process running. Close it, rediscover the current version and relaunch it
@@ -156,14 +142,14 @@ func run() error {
 		case <-discordDone:
 			time.Sleep(2 * time.Second)
 			if !processRunning(install.ProcessName) {
-				log.Printf("Discord encerrado; finalizando Tor")
+				consolef("INFO", "Discord encerrado; finalizando Tor.")
 				return nil
 			}
 			handovers++
 			if handovers > 3 {
 				return errors.New("Discord reiniciou repetidamente; feche-o e execute o launcher outra vez")
 			}
-			log.Printf("Discord reiniciou; reaplicando PAC local")
+			consolef("INFO", "Discord reiniciou; reaplicando PAC local.")
 			if err := stopDiscord(install.ProcessName); err != nil {
 				return err
 			}
@@ -180,7 +166,8 @@ func run() error {
 }
 
 func startDiscord(install discord.Installation, pacURL string) (<-chan error, error) {
-	cmd := exec.Command(install.Executable, "--proxy-pac-url="+pacURL)
+	cmd := exec.Command(install.Executable, discord.ChromiumArgs(pacURL)...)
+	cmd.Dir = filepath.Dir(install.Executable)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("abrir %s: %w", install.Flavor, err)
 	}
@@ -317,11 +304,19 @@ func portInUse(address string) bool {
 }
 
 var (
-	kernel32     = syscall.NewLazyDLL("kernel32.dll")
-	user32       = syscall.NewLazyDLL("user32.dll")
-	createMutexW = kernel32.NewProc("CreateMutexW")
-	messageBoxW  = user32.NewProc("MessageBoxW")
+	kernel32           = syscall.NewLazyDLL("kernel32.dll")
+	user32             = syscall.NewLazyDLL("user32.dll")
+	createMutexW       = kernel32.NewProc("CreateMutexW")
+	messageBoxW        = user32.NewProc("MessageBoxW")
+	setConsoleOutputCP = kernel32.NewProc("SetConsoleOutputCP")
+	setConsoleCP       = kernel32.NewProc("SetConsoleCP")
 )
+
+func enableUTF8Console() {
+	const utf8 = 65001
+	_, _, _ = setConsoleOutputCP.Call(utf8)
+	_, _, _ = setConsoleCP.Call(utf8)
+}
 
 func alreadyRunning() bool {
 	name, _ := syscall.UTF16PtrFromString(`Local\GoLiveBypassTorMinimal`)

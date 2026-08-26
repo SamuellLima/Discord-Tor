@@ -1,3 +1,3 @@
-module github.com/bezumiya/Discord-Tor/golive-minimal
+module discord-tor
 
 go 1.26.5
