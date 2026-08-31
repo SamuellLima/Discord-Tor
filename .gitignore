@@ -1,2 +1,6 @@
 *.log
+__pycache__/
+
+*_obsolete.exe
+*_obsolete.exe.sha256
 

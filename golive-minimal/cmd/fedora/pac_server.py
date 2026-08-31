@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import http.server
 import sys
+import time
 
 
 if len(sys.argv) != 2:
@@ -17,9 +18,16 @@ pac = f'''function FindProxyForURL(url, host) {{
 '''.encode("ascii")
 
 
+def debug(message):
+    sys.stderr.write("[%s] [DEBUG] %s\n" % (time.strftime("%H:%M:%S"), message))
+    sys.stderr.flush()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        debug("PAC %s %s de %s" % (self.command, self.path, self.client_address[0]))
         if self.path != "/discord-tor.pac":
+            debug("PAC 404 %s" % self.path)
             self.send_error(404)
             return
         self.send_response(200)
@@ -30,9 +38,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(pac)
 
     def log_message(self, _format, *args):
-        pass
+        debug(_format % args)
+
+    def log_error(self, _format, *args):
+        sys.stderr.write("[%s] [ERRO] PAC %s\n" % (time.strftime("%H:%M:%S"), _format % args))
+        sys.stderr.flush()
 
 
 server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+debug("PAC escutando em 127.0.0.1:%d" % server.server_port)
 print(server.server_port, flush=True)
 server.serve_forever()

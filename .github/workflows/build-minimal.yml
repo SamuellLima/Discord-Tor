@@ -21,17 +21,21 @@ jobs:
           cache-dependency-path: golive-minimal/go.mod
       - run: go test ./...
         working-directory: golive-minimal
-      - name: Build native Windows launcher
+      - name: Build Windows launchers
         working-directory: golive-minimal
         shell: pwsh
         run: |
           $env:CGO_ENABLED = '0'
-          go build -trimpath -buildvcs=true -ldflags="-s -w" -o GoLiveTor.exe ./cmd/golive-tor
-          (Get-FileHash -Algorithm SHA256 .\GoLiveTor.exe).Hash.ToLower() | Set-Content -NoNewline GoLiveTor.exe.sha256
+          go build -trimpath -buildvcs=true -ldflags="-s -w" -o DiscordTor-debug.exe ./cmd/golive-tor
+          go build -tags silent -trimpath -buildvcs=true -ldflags="-s -w -H=windowsgui" -o DiscordTor.exe ./cmd/golive-tor
+          (Get-FileHash -Algorithm SHA256 .\DiscordTor-debug.exe).Hash.ToLower() | Set-Content -NoNewline DiscordTor-debug.exe.sha256
+          (Get-FileHash -Algorithm SHA256 .\DiscordTor.exe).Hash.ToLower() | Set-Content -NoNewline DiscordTor.exe.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: GoLiveTor-windows-amd64
+          name: DiscordTor-windows-amd64
           path: |
-            golive-minimal/GoLiveTor.exe
-            golive-minimal/GoLiveTor.exe.sha256
+            golive-minimal/DiscordTor.exe
+            golive-minimal/DiscordTor.exe.sha256
+            golive-minimal/DiscordTor-debug.exe
+            golive-minimal/DiscordTor-debug.exe.sha256
           if-no-files-found: error
