@@ -27,7 +27,10 @@ import (
 	"discord-tor/internal/torcheck"
 )
 
-const socksAddress = "127.0.0.1:9060"
+var socksAddress = os.Getenv("DISCORD_TOR_SOCKS_ADDRESS")
+if socksAddress == "" {
+	socksAddress = "127.0.0.1:9060" // Fallback to default if not set in env
+}
 
 func main() {
 	initConsole()
@@ -330,7 +333,20 @@ func stopDiscord(processName string) error {
 }
 
 func processRunning(processName string) bool {
-	cmd := exec.Command("tasklist.exe", "/FI", "IMAGENAME eq "+processName, "/FO", "CSV", "/NH")
+	// Sanitize processName for use in tasklist.exe to prevent injection
+	name := regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)
+	cleanProcessName := strings.TrimSpace(processName)
+	if !name.MatchString(cleanProcessName) {
+		// Fallback sanitization for characters that might slip through but are unsafe for command line arguments
+		for _, r := range []string{" ", "&", "|", ";", "`", "$"} {
+			cleanProcessName = strings.ReplaceAll(cleanProcessName, r, "")
+		}
+		debugf("WARN", "Nome de processo '%s' contem caracteres inseguros e foi sanitizado para: %s", processName, cleanProcessName)
+	} else {
+		name = cleanProcessName
+	}
+	// Use the sanitized name for the command execution
+	cmd := exec.Command("tasklist.exe", "/FI", "IMAGENAME eq "+name, "/FO", "CSV", "/NH")
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	out, err := cmd.Output()
 	if err != nil {
