@@ -247,8 +247,8 @@ func startTor(p torbundle.Paths, root string) (*exec.Cmd, <-chan error, error) {
 }
 
 func waitForTor(ctx context.Context, done <-chan error) error {
-		deadline := time.NewTimer(5 * time.Minute)
-		defer deadline.Stop()
+	deadline := time.NewTimer(2 * time.Minute)
+	defer deadline.Stop()
 	ticker := time.NewTicker(1500 * time.Millisecond)
 	defer ticker.Stop()
 	lastTalk := time.Time{}
@@ -293,14 +293,14 @@ func servePAC() (string, func(), error) {
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write([]byte(pac.Script(socksAddress)))
 	})
-	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 3 * time.Second}
 	go func() {
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			debugf("ERRO", "servidor PAC: %v", err)
 		}
 	}()
 	stop := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(ctx)
 	}
